@@ -267,6 +267,7 @@ pub struct RowsView {
     pub selection: Selection,
     perf_stats: Option<PerfStats>,
     marked_rows: HashSet<usize>,
+    hidden_columns: HashSet<usize>,
 }
 
 impl RowsView {
@@ -289,6 +290,7 @@ impl RowsView {
             selection: Selection::default(num_rows),
             perf_stats: None,
             marked_rows: HashSet::new(),
+            hidden_columns: HashSet::new(),
         };
         Ok(view)
     }
@@ -392,12 +394,12 @@ impl RowsView {
         filter_finder: Option<&find::Finder>,
     ) -> CsvlensResult<()> {
         self.reader = reader;
-        self.headers = Self::get_default_headers_from_reader(&self.reader);
         if let Some(finder) = filter_finder {
             self.set_filter(finder)?;
         } else {
             self.do_get_rows()?;
         }
+        self.recompute_headers();
         Ok(())
     }
 
@@ -438,22 +440,14 @@ impl RowsView {
 
     pub fn set_columns_filter(&mut self, columns_filter: &Arc<ColumnsFilter>) -> CsvlensResult<()> {
         let columns_filter = columns_filter.clone();
-        self.headers = columns_filter
-            .indices()
-            .iter()
-            .zip(columns_filter.filtered_headers())
-            .map(|(i, h)| Header {
-                name: h.clone(),
-                origin_index: *i,
-            })
-            .collect();
         self.columns_filter = Some(columns_filter);
+        self.recompute_headers();
         self.do_get_rows()
     }
 
     pub fn reset_columns_filter(&mut self) -> CsvlensResult<()> {
         self.columns_filter = None;
-        self.headers = Self::get_default_headers_from_reader(&self.reader);
+        self.recompute_headers();
         self.do_get_rows()
     }
 
@@ -473,8 +467,78 @@ impl RowsView {
             .collect::<Vec<_>>()
     }
 
+    fn visible_indices(&self) -> Vec<usize> {
+        let base_indices: Vec<usize> = if let Some(columns_filter) = &self.columns_filter {
+            columns_filter.indices().clone()
+        } else {
+            (0..self.reader.headers.len()).collect()
+        };
+        base_indices
+            .into_iter()
+            .filter(|i| !self.hidden_columns.contains(i))
+            .collect()
+    }
+
+    fn recompute_headers(&mut self) {
+        self.hidden_columns
+            .retain(|i| *i < self.reader.headers.len());
+        let indices = self.visible_indices();
+        self.headers = indices
+            .iter()
+            .map(|i| Header {
+                name: self.reader.headers[*i].clone(),
+                origin_index: *i,
+            })
+            .collect();
+        self.cols_offset.num_freeze = min(
+            self.cols_offset.num_freeze,
+            self.headers.len().saturating_sub(1) as u64,
+        );
+        let max_skip = self.max_cols_offset_num_skip();
+        self.cols_offset.num_skip = min(self.cols_offset.num_skip, max_skip);
+
+        if let Some(selected) = self.selection.column.index() {
+            let num_headers = self.headers.len() as u64;
+            if num_headers == 0 {
+                self.selection.column.unset_index();
+            } else if selected >= num_headers {
+                self.selection
+                    .column
+                    .set_index(num_headers.saturating_sub(1));
+            }
+        }
+    }
+
+    pub fn hide_column(&mut self, origin_index: usize) -> CsvlensResult<bool> {
+        if origin_index >= self.reader.headers.len() {
+            return Ok(false);
+        }
+        if self.visible_indices().len() <= 1 {
+            return Ok(false);
+        }
+        if !self.hidden_columns.insert(origin_index) {
+            return Ok(false);
+        }
+        self.recompute_headers();
+        self.do_get_rows()?;
+        Ok(true)
+    }
+
+    pub fn clear_hidden_columns(&mut self) -> CsvlensResult<()> {
+        if self.hidden_columns.is_empty() {
+            return Ok(());
+        }
+        self.hidden_columns.clear();
+        self.recompute_headers();
+        self.do_get_rows()
+    }
+
     pub fn sorter(&self) -> &Option<Arc<Sorter>> {
         &self.sorter
+    }
+
+    pub fn has_hidden_columns(&self) -> bool {
+        !self.hidden_columns.is_empty()
     }
 
     pub fn set_sorter(&mut self, sorter: &Arc<Sorter>) -> CsvlensResult<()> {
@@ -695,8 +759,9 @@ impl RowsView {
             self.reader.get_rows(self.rows_from, self.num_rows)?
         };
         let elapsed = start.elapsed();
-        if let Some(columns_filter) = &self.columns_filter {
-            rows = Self::subset_columns(&rows, columns_filter.indices());
+        let visible_indices = self.visible_indices();
+        if visible_indices.len() < self.reader.headers.len() {
+            rows = Self::subset_columns(&rows, &visible_indices);
         }
         self.rows = rows;
         self.perf_stats = Some(PerfStats {

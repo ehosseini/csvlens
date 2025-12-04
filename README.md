@@ -44,6 +44,8 @@ Key | Action
 `<` | Decrease selected column's width
 `Shift + ↓` (or `J`) | Sort rows or toggle sort direction by the selected column
 `Ctrl + j` | Same as above, but sort by natural ordering (e.g. "file2" < "file10")
+`Ctrl + ;` | Hide the selected column
+`Ctrl + '` | Unhide all hidden columns
 `#` (in Cell mode) | Find and highlight rows like the selected cell
 `@` (in Cell mode) | Filter rows like the selected cell
 `y` | Copy the selected row or cell to clipboard

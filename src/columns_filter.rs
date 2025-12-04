@@ -4,7 +4,6 @@ use regex::Regex;
 pub struct ColumnsFilter {
     pattern: Regex,
     indices: Vec<usize>,
-    filtered_headers: Vec<String>,
     filtered_flags: Vec<bool>,
     num_columns_before_filter: usize,
     disabled_because_no_match: bool,
@@ -13,12 +12,10 @@ pub struct ColumnsFilter {
 impl ColumnsFilter {
     pub fn new(pattern: Regex, headers: &[String]) -> Self {
         let mut indices = vec![];
-        let mut filtered_headers: Vec<String> = vec![];
         let mut filtered_flags: Vec<bool> = vec![];
         for (i, header) in headers.iter().enumerate() {
             if pattern.is_match(header) {
                 indices.push(i);
-                filtered_headers.push(header.clone());
                 filtered_flags.push(true);
             } else {
                 filtered_flags.push(false);
@@ -27,7 +24,6 @@ impl ColumnsFilter {
         let disabled_because_no_match;
         if indices.is_empty() {
             indices = (0..headers.len()).collect();
-            filtered_headers = headers.into();
             disabled_because_no_match = true;
         } else {
             disabled_because_no_match = false;
@@ -35,15 +31,10 @@ impl ColumnsFilter {
         Self {
             pattern,
             indices,
-            filtered_headers,
             filtered_flags,
             num_columns_before_filter: headers.len(),
             disabled_because_no_match,
         }
-    }
-
-    pub fn filtered_headers(&self) -> &Vec<String> {
-        &self.filtered_headers
     }
 
     pub fn indices(&self) -> &Vec<usize> {

@@ -41,6 +41,8 @@ TAB                     : Toggle between row, column or cell selection modes
 <                       : Decrease selected column's width
 Shift + ↓ (or J)        : Sort rows by the selected column (auto by type: numeric for numbers and lexicographic for text)
 Ctrl + J                : Sort rows by the selected column (natural; e.g. \"file2\" < \"file10\")
+Ctrl + ;                : Hide the selected column
+Ctrl + '                : Unhide all hidden columns
 # (in Cell mode)        : Find and highlight rows like the selected cell
 @ (in Cell mode)        : Filter rows like the selected cell
 y                       : Copy the selected row or cell to clipboard

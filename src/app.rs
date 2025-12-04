@@ -530,6 +530,34 @@ impl App {
             Control::ToggleLineWrap(word_wrap) => {
                 self.handle_line_wrap_toggle(*word_wrap, true);
             }
+            Control::HideColumn => {
+                if let Some(origin_index) = self.get_global_selected_column_index() {
+                    let column_name =
+                        self.rows_view.get_column_name_from_global_index(origin_index as usize);
+                    if self.rows_view.hide_column(origin_index as usize)? {
+                        self.transient_message
+                            .replace(format!("Hidden column {}", column_name));
+                        self.csv_table_state.reset_buffer();
+                    } else {
+                        self.transient_message
+                            .replace("Cannot hide column (none selected or last column)".to_string());
+                    }
+                } else {
+                    self.transient_message
+                        .replace("Select a column first to hide it".to_string());
+                }
+            }
+            Control::UnhideColumns => {
+                if self.rows_view.has_hidden_columns() {
+                    self.rows_view.clear_hidden_columns()?;
+                    self.csv_table_state.reset_buffer();
+                    self.transient_message
+                        .replace("All hidden columns restored".to_string());
+                } else {
+                    self.transient_message
+                        .replace("No hidden columns to restore".to_string());
+                }
+            }
             Control::ToggleSort | Control::ToggleNaturalSort => {
                 let desired_sort_type = if matches!(control, Control::ToggleNaturalSort) {
                     sort::SortType::Natural
@@ -611,6 +639,7 @@ impl App {
                 self.csv_table_state.column_width_overrides.reset();
                 self.reset_filter();
                 self.reset_columns_filter();
+                self.rows_view.clear_hidden_columns()?;
                 self.reset_sorter();
             }
             Control::UnknownOption(s) => {
