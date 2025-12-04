@@ -101,6 +101,9 @@ Key | Action
 
 * `--color-columns` (or `--colorful`): Display each column in a different color.
 
+* `-f`, `--follow`: Auto-reload the file and keep the view anchored to the latest rows (like
+  `tail -f`).
+
 ## Installation
 
 ### Direct download

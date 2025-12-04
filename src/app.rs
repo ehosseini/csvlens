@@ -182,6 +182,7 @@ pub struct App {
     sorter: Option<Arc<sort::Sorter>>,
     sort_order: SortOrder,
     wrap_mode: WrapMode,
+    follow: bool,
     #[cfg(feature = "clipboard")]
     clipboard: Result<Clipboard>,
 }
@@ -204,6 +205,7 @@ impl App {
         prompt: Option<String>,
         wrap_mode: Option<WrapMode>,
         auto_reload: bool,
+        follow: bool,
     ) -> CsvlensResult<Self> {
         let watcher = if auto_reload {
             Some(Arc::new(Watcher::new(filename)?))
@@ -280,6 +282,7 @@ impl App {
             sorter: None,
             sort_order: SortOrder::Ascending,
             wrap_mode: WrapMode::default(),
+            follow,
             #[cfg(feature = "clipboard")]
             clipboard,
         };
@@ -299,6 +302,10 @@ impl App {
 
         if let Some(mode) = wrap_mode {
             app.handle_line_wrap_toggle(mode, false);
+        }
+
+        if app.follow {
+            app.scroll_to_bottom()?;
         }
 
         Ok(app)
@@ -932,6 +939,10 @@ impl App {
             self.rows_view.set_columns_filter(&columns_filter).unwrap();
         }
 
+        if self.follow {
+            self.scroll_to_bottom()?;
+        }
+
         Ok(())
     }
 
@@ -1008,6 +1019,10 @@ impl App {
             self.transient_message
                 .replace(self.wrap_mode.transient_message());
         }
+    }
+
+    fn scroll_to_bottom(&mut self) -> CsvlensResult<()> {
+        self.rows_view.handle_control(&Control::ScrollBottom)
     }
 
     fn render_frame(&mut self, f: &mut Frame) {

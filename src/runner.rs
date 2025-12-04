@@ -110,6 +110,10 @@ struct Args {
     #[clap(long)]
     pub auto_reload: bool,
 
+    /// Follow the file for new rows (like `tail -f`). Implies --auto-reload.
+    #[clap(short = 'f', long)]
+    pub follow: bool,
+
     /// Show stats for debugging
     #[clap(long)]
     debug: bool,
@@ -154,13 +158,14 @@ impl From<Args> for CsvlensOptions {
             ignore_case: args.ignore_case,
             echo_column: args.echo_column,
             debug: args.debug,
-            freeze_cols_offset: None,
-            color_columns: args.color_columns,
-            prompt: args.prompt,
-            wrap_mode: Args::get_wrap_mode(args.wrap, args.wrap_chars, args.wrap_words),
-            auto_reload: args.auto_reload,
-        }
+        freeze_cols_offset: None,
+        color_columns: args.color_columns,
+        prompt: args.prompt,
+        wrap_mode: Args::get_wrap_mode(args.wrap, args.wrap_chars, args.wrap_words),
+        auto_reload: args.auto_reload || args.follow,
+        follow: args.follow,
     }
+}
 }
 
 // Struct for library usage without clap directives
@@ -182,6 +187,7 @@ pub struct CsvlensOptions {
     pub prompt: Option<String>,
     pub wrap_mode: Option<WrapMode>,
     pub auto_reload: bool,
+    pub follow: bool,
 }
 
 struct AppRunner {
@@ -257,6 +263,7 @@ pub fn run_csvlens_with_options(options: CsvlensOptions) -> CsvlensResult<Option
 
     let file = SeekableFile::new(&options.filename)?;
     let filename = file.filename();
+    let auto_reload = options.auto_reload || options.follow;
 
     let app = App::new(
         filename,
@@ -273,7 +280,8 @@ pub fn run_csvlens_with_options(options: CsvlensOptions) -> CsvlensResult<Option
         options.color_columns,
         options.prompt,
         options.wrap_mode,
-        options.auto_reload,
+        auto_reload,
+        options.follow,
     )?;
 
     let mut app_runner = AppRunner::new(app);
